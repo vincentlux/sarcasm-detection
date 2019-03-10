@@ -119,9 +119,6 @@ def train(model, iterator, optimizer, criterion):
     for batch in iterator:
         optimizer.zero_grad()
         pred = model(batch.c).squeeze(1)
-
-        # actually looped over by time step
-        # explanation on https://www.youtube.com/watch?v=ogZi5oIo4fI
         loss= criterion(pred, batch.l)
         acc = binary_accuracy(pred, batch.l)
         loss.backward()
@@ -214,35 +211,45 @@ if __name__ == '__main__':
     model = model.to(device)
     criterion = criterion.to(device)
 
+    
+    best_valid_loss = -1
     # train
     for epoch in range(args.nepoch):
         print(epoch)
         train_loss, train_acc = train(model, train_iterator, opt, criterion)
         valid_loss, valid_acc = evaluate(model, valid_iterator, criterion)
+        
+        # save best model
+        if valid_acc > best_valid_loss:
+            
 
         print(f'| Epoch: {epoch+1:02} | Train Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}% | Val. Loss: {valid_loss:.3f} | Val. Acc: {valid_acc*100:.2f}% |')
 
+    print(predict_sentiment(COMMENT, "You are amazing"))
     # submit
     sub_f = os.path.join(data_path, 'test.tsv')
     sub_df = pd.read_csv(sub_f, sep='\t')
     # add a new col
-
-
-    ## possible bugs here
-
     # sub_df['label'] = -1
-    # for i in range(len(sub_df)):
-    #     print(i)
-    #     sent = sub_df.iloc[i]['comment']
-    #     score = predict_sentiment(COMMENT, sent)
-    #     if score > 0.5:
-    #         sub_df.iloc[i]['label'] = 1
-    #     else:
-    #         sub_df.iloc[i]['label'] = 0
+    result=[]
+    for i in range(len(sub_df)):
+        # print(len(sub_df), i)
+        sent = sub_df.iloc[i]['comment']
+        # print(sent)
+        score = predict_sentiment(COMMENT, sent)
+        # print(score)
+        if score > 0.5:
+            print("no_sarc")
+            result.append(1)
+        else:
+            result.append(0)
+        if i % 100 == 0:
+            print(i, " out of ", len(sub_df), " has been processed")
 
-    # print(sub_df.head())
+    print(len(result))
 
-    # dout = os.path.join(args.out_path, args.sub_name)
+    dout = os.path.join(args.out_path, args.sub_name)
     # sub_df["label"].to_csv(dout, header=["label"], index_label="id")
 
 
+    ########SAVE result
