@@ -19,10 +19,6 @@ from torchtext import datasets
 
 # LABEL = data.Field(sequential=False)
 
-
-
-
-
 ###########TODO: ADD submit=True args so that for submission, use all data to train?
 
 
@@ -95,7 +91,6 @@ class RNN(nn.Module):
         hidden = self.dropout(torch.cat((hidden[-2,:,:], hidden[-1,:,:]), dim=1))
 
         #hidden = [batch size, hid dim * num directions]
-
         return self.fc(hidden.squeeze(0))
 
 
@@ -143,9 +138,8 @@ def evaluate(model, iterator, criterion):
 
     return epoch_loss / len(iterator), epoch_acc / len(iterator)
 
-def predict_sentiment(COMMENT, sentence):
-    nlp = spacy.load('en')
-    tokenized = [tok.text for tok in nlp.tokenizer(sentence)]
+def predict_sentiment(model, COMMENT, sentence, s_tkr):
+    tokenized = [tok.text for tok in s_tkr.tokenizer(str(sentence))]
     indexed = [COMMENT.vocab.stoi[t] for t in tokenized]
     tensor = torch.LongTensor(indexed).to(device)
     tensor = tensor.unsqueeze(1)
@@ -169,7 +163,7 @@ if __name__ == '__main__':
     parser.add_argument("--out_path", default='./result', type=str, help='out dir')
     parser.add_argument("--train_file", default='train_resplit.tsv', type=str, help='training data')
     parser.add_argument("--test_file", default='val_resplit.tsv', type=str, help='validation data')
-    parser.add_argument("--sub_name", default='submit.csv', type=str, help='name for submission tsv, .tsv will be added automatically')
+    parser.add_argument("--sub_name", default='submit', type=str, help='name for submission tsv, .tsv will be added automatically')
     args = parser.parse_args()
 
     if torch.cuda.is_available():
@@ -212,7 +206,7 @@ if __name__ == '__main__':
     criterion = criterion.to(device)
 
     
-    best_valid_loss = -1
+    best_valid_acc = -1
     # train
     for epoch in range(args.nepoch):
         print(epoch)
@@ -220,12 +214,19 @@ if __name__ == '__main__':
         valid_loss, valid_acc = evaluate(model, valid_iterator, criterion)
         
         # save best model
-        if valid_acc > best_valid_loss:
-            
+        if valid_acc > best_valid_acc:
+            best_valid_acc = valid_acc
+            state = {'model': model.state_dict(), 'epoch': epoch}
+            torch.save(state, os.path.join('.', 'model_best.pt'))
 
         print(f'| Epoch: {epoch+1:02} | Train Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}% | Val. Loss: {valid_loss:.3f} | Val. Acc: {valid_acc*100:.2f}% |')
 
-    print(predict_sentiment(COMMENT, "You are amazing"))
+    spacy_tkr = spacy.load('en')
+    check_point = torch.load(os.path.join('.', 'model_best.pt'))
+    print(predict_sentiment(model, COMMENT, "You are amazing", spacy_tkr))
+    model.load_state_dict(check_point['model'])
+    print(f"Best model from epoch {check_point['epoch']}")
+    print(predict_sentiment(model, COMMENT, "You are amazing", spacy_tkr))
     # submit
     sub_f = os.path.join(data_path, 'test.tsv')
     sub_df = pd.read_csv(sub_f, sep='\t')
@@ -233,23 +234,21 @@ if __name__ == '__main__':
     # sub_df['label'] = -1
     result=[]
     for i in range(len(sub_df)):
-        # print(len(sub_df), i)
         sent = sub_df.iloc[i]['comment']
-        # print(sent)
-        score = predict_sentiment(COMMENT, sent)
+        score = predict_sentiment(model, COMMENT, sent, spacy_tkr)
         # print(score)
         if score > 0.5:
-            print("no_sarc")
+            # print("no_sarc")
             result.append(1)
         else:
             result.append(0)
-        if i % 100 == 0:
+        if i % 1000 == 0:
             print(i, " out of ", len(sub_df), " has been processed")
-
     print(len(result))
+    sub_df['label'] = result
 
-    dout = os.path.join(args.out_path, args.sub_name)
-    # sub_df["label"].to_csv(dout, header=["label"], index_label="id")
+    dout = os.path.join(args.out_path, args.sub_name+'.csv')
+    sub_df["label"].to_csv(dout, header=["label"], index_label="id")
 
 
     ########SAVE result
