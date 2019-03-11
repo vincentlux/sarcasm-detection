@@ -22,9 +22,12 @@ from torchtext import datasets
 ###########TODO: ADD submit=True args so that for submission, use all data to train?
 
 
-def get_data(train, test):
+def get_data(train, test, lower=False):
     LABEL = data.LabelField(dtype=torch.float)
-    COMMENT = data.Field()
+    if lower:
+        COMMENT = data.Field(lower=True)
+    else:
+        COMMENT = data.Field()
     # PARENT = data.Field()
     fields = [('l', LABEL), ('c', COMMENT), (None, None)]
 
@@ -78,7 +81,6 @@ class RNN(nn.Module):
         embedded = self.dropout(self.embedding(x))
 
         #embedded = [sent len, batch size, emb dim]
-
         output, (hidden, cell) = self.rnn(embedded)
 
         #output = [sent len, batch size, hid dim * num directions]
@@ -164,6 +166,7 @@ if __name__ == '__main__':
     parser.add_argument("--train_file", default='train_resplit.tsv', type=str, help='training data')
     parser.add_argument("--test_file", default='val_resplit.tsv', type=str, help='validation data')
     parser.add_argument("--sub_name", default='submit', type=str, help='name for submission tsv, .tsv will be added automatically')
+    parser.add_argument("--lower", action='store_true', help='if present, do lowercase to train/test data')
     args = parser.parse_args()
 
     if torch.cuda.is_available():

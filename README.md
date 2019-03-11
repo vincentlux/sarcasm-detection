@@ -1,5 +1,11 @@
 # Sarcasm detection
 
+## todo
+1. analyze stopwords, lowercase of spacy tokenizer
+2. use attention
+3. try cnn
+
+
 ## Idea
 1. cnn (still treat it as sentiment analysis)
 2. regard it as NLI problem (sent a, sent b => predict relationship)
