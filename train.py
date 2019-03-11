@@ -155,7 +155,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_layer', default=2, type=int, help='number of layer')
     parser.add_argument('--eS', default=100, type=int, help='embedding size')
     parser.add_argument('--dr', default=0.5, type=float, help='drop out rate')
-    parser.add_argument("--opt_test", action='store_true', help='if exist, use new opt')
+    parser.add_argument("--opt_adam", action='store_true', help='if exist, use adam, else sgd')
     parser.add_argument("--lr", default=0.0001, type=float, help='learning rate')
 
     parser.add_argument('--bidirect', action='store_true', help='if present, use bidirectional lstm')
@@ -197,10 +197,10 @@ if __name__ == '__main__':
     model.embedding.weight.data.copy_(pretrained_embeddings)
 
     # set opt and criterion
-    if args.opt_test:
+    if args.opt_adam:
         opt = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, weight_decay=0)
     else:
-        opt = optim.Adam(model.parameters())
+        opt = optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
     criterion = nn.BCEWithLogitsLoss()
     model = model.to(device)
     criterion = criterion.to(device)
