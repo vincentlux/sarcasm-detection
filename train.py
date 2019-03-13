@@ -157,7 +157,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_layer', default=2, type=int, help='number of layer')
     parser.add_argument('--eS', default=100, type=int, help='embedding size')
     parser.add_argument('--dr', default=0.5, type=float, help='drop out rate')
-    parser.add_argument("--opt_adam", action='store_true', help='if exist, use adam, else sgd')
+    parser.add_argument("--opt_sgd", action='store_true', help='if exist, use sgd, else adam')
     parser.add_argument("--lr", default=0.0001, type=float, help='learning rate')
 
     parser.add_argument('--bidirect', action='store_true', help='if present, use bidirectional lstm')
@@ -167,6 +167,7 @@ if __name__ == '__main__':
     parser.add_argument("--test_file", default='val_resplit.tsv', type=str, help='validation data')
     parser.add_argument("--sub_name", default='submit', type=str, help='name for submission tsv, .tsv will be added automatically')
     parser.add_argument("--lower", action='store_true', help='if present, do lowercase to train/test data')
+    parser.add_argument("--w_decay", default=1e-5, type=float, help='regularization param')
     args = parser.parse_args()
 
     if torch.cuda.is_available():
@@ -200,8 +201,8 @@ if __name__ == '__main__':
     model.embedding.weight.data.copy_(pretrained_embeddings)
 
     # set opt and criterion
-    if args.opt_adam:
-        opt = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, weight_decay=0)
+    if not args.opt_sgd:
+        opt = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, weight_decay=args.w_decay)
     else:
         opt = optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
     criterion = nn.BCEWithLogitsLoss()
@@ -212,23 +213,23 @@ if __name__ == '__main__':
     best_valid_acc = -1
     # train
     for epoch in range(args.nepoch):
-        print(epoch)
         train_loss, train_acc = train(model, train_iterator, opt, criterion)
         valid_loss, valid_acc = evaluate(model, valid_iterator, criterion)
-        
         # save best model
         if valid_acc > best_valid_acc:
             best_valid_acc = valid_acc
             state = {'model': model.state_dict(), 'epoch': epoch}
             torch.save(state, os.path.join('.', 'model_best.pt'))
 
-        print(f'| Epoch: {epoch+1:02} | Train Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}% | Val. Loss: {valid_loss:.3f} | Val. Acc: {valid_acc*100:.2f}% |')
+        print(f' Epoch: {epoch+1:02}  Train Loss: {train_loss:.3f}  Train Acc: {train_acc*100:.2f}%  Val. Loss: {valid_loss:.3f}  Val. Acc: {valid_acc*100:.2f}% ')
 
+
+    # submission
     spacy_tkr = spacy.load('en')
     check_point = torch.load(os.path.join('.', 'model_best.pt'))
     print(predict_sentiment(model, COMMENT, "You are amazing", spacy_tkr))
     model.load_state_dict(check_point['model'])
-    print(f"Best model from epoch {check_point['epoch']}")
+    print(f"Best model from epoch {check_point['epoch']+1}")
     print(predict_sentiment(model, COMMENT, "You are amazing", spacy_tkr))
     # submit
     sub_f = os.path.join(data_path, 'test.tsv')

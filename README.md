@@ -1,5 +1,8 @@
 # Sarcasm detection
 
+## to run:
+python train.py --nepoch 20 --num_layer 3 --hS 128 --bidirect --lower --sub_name sentiment-bilstm-adam-epoch20-lower-num3-hs128
+
 ## todo
 1. analyze stopwords, lowercase of spacy tokenizer
 2. use attention
