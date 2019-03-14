@@ -189,8 +189,10 @@ def evaluate(model, iterator, criterion):
     return epoch_loss / len(iterator), epoch_acc / len(iterator)
 
 
-def predict_sentiment(model, COMMENT, sentence, s_tkr):
+def predict_sentiment(args, model, COMMENT, sentence, s_tkr):
     tokenized = [tok.text for tok in s_tkr.tokenizer(str(sentence))]
+    if args.model == 'cnn' and len(tokenized) < 5:
+        tokenized += ['<pad>'] * (5 - len(tokenized))
     indexed = [COMMENT.vocab.stoi[t] for t in tokenized]
     tensor = torch.LongTensor(indexed).to(device)
     tensor = tensor.unsqueeze(1)
@@ -305,7 +307,7 @@ if __name__ == '__main__':
     result=[]
     for i in range(len(sub_df)):
         sent = sub_df.iloc[i]['comment']
-        score = predict_sentiment(model, COMMENT, sent, spacy_tkr)
+        score = predict_sentiment(args, model, COMMENT, sent, spacy_tkr)
         # print(score)
         if score > 0.5:
             # print("no_sarc")
