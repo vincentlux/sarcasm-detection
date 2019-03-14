@@ -2,7 +2,7 @@
 # coding: utf-8
 
 # test building own dataset using torchtext
-import os, argparse
+import os, argparse, random
 import numpy as np
 import pandas as pd
 import torch
@@ -10,7 +10,6 @@ import spacy
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-import random
 # from torch.autograd import Variable
 # from torch.utils.data import Dataset, DataLoader
 from torchtext import data
@@ -52,15 +51,10 @@ def get_data(args, train, test):
     ## build own data set finish
 
     train_data, valid_data = train_data.split(split_ratio=0.9, random_state=random.seed(42))
-
     # print(vars(train_data[1]))
-
     COMMENT.build_vocab(train_data, vectors="glove.6B.100d")
     LABEL.build_vocab(train_data)
-
     return train_data, valid_data, test_data, COMMENT
-
-
 
 
 def get_dataloader(device, train_data, valid_data, test_data, bS):
@@ -72,35 +66,35 @@ def get_dataloader(device, train_data, valid_data, test_data, bS):
         device=device)
     return train_iterator, valid_iterator, test_iterator
 
-# class RNN(nn.Module):
-#     def __init__(self, vocab_size, embedding_dim, hidden_dim, output_dim, n_layers, bidirectional, dropout):
-#         super().__init__()
+class RNN(nn.Module):
+    def __init__(self, vocab_size, embedding_dim, hidden_dim, output_dim, n_layers, bidirectional, dropout):
+        super().__init__()
 
-#         self.embedding = nn.Embedding(vocab_size, embedding_dim)
-#         self.rnn = nn.LSTM(embedding_dim, hidden_dim, num_layers=n_layers, bidirectional=bidirectional, dropout=dropout)
-#         self.fc = nn.Linear(hidden_dim*2, output_dim)
-#         self.dropout = nn.Dropout(dropout)
+        self.embedding = nn.Embedding(vocab_size, embedding_dim)
+        self.rnn = nn.LSTM(embedding_dim, hidden_dim, num_layers=n_layers, bidirectional=bidirectional, dropout=dropout)
+        self.fc = nn.Linear(hidden_dim*2, output_dim)
+        self.dropout = nn.Dropout(dropout)
 
-#     def forward(self, x):
+    def forward(self, x):
 
-#         #x = [sent len, batch size]
+        #x = [sent len, batch size]
 
-#         embedded = self.dropout(self.embedding(x))
+        embedded = self.dropout(self.embedding(x))
 
-#         #embedded = [sent len, batch size, emb dim]
-#         output, (hidden, cell) = self.rnn(embedded)
+        #embedded = [sent len, batch size, emb dim]
+        output, (hidden, cell) = self.rnn(embedded)
 
-#         #output = [sent len, batch size, hid dim * num directions]
-#         #hidden = [num layers * num directions, batch size, hid dim]
-#         #cell = [num layers * num directions, batch size, hid dim]
+        #output = [sent len, batch size, hid dim * num directions]
+        #hidden = [num layers * num directions, batch size, hid dim]
+        #cell = [num layers * num directions, batch size, hid dim]
 
-#         #concat the final forward (hidden[-2,:,:]) and backward (hidden[-1,:,:]) hidden layers
-#         #and apply dropout
+        #concat the final forward (hidden[-2,:,:]) and backward (hidden[-1,:,:]) hidden layers
+        #and apply dropout
 
-#         hidden = self.dropout(torch.cat((hidden[-2,:,:], hidden[-1,:,:]), dim=1))
+        hidden = self.dropout(torch.cat((hidden[-2,:,:], hidden[-1,:,:]), dim=1))
 
-#         #hidden = [batch size, hid dim * num directions]
-#         return self.fc(hidden.squeeze(0))
+        #hidden = [batch size, hid dim * num directions]
+        return self.fc(hidden.squeeze(0))
 
 class CNN(nn.Module):
     def __init__(self, vocab_size, embedding_dim, n_filters, filter_sizes, output_dim, dropout):
@@ -208,7 +202,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_layer', default=2, type=int, help='number of layer')
     parser.add_argument('--eS', default=100, type=int, help='embedding size')
     parser.add_argument('--dr', default=0.5, type=float, help='drop out rate')
-    parser.add_argument("--opt_adam", action='store_true', help='if exist, use adam, else sgd')
+    parser.add_argument("--opt_sgd", action='store_true', help='if exist, use sgd, else adam')
     parser.add_argument("--lr", default=0.0001, type=float, help='learning rate')
 
     parser.add_argument('--bidirect', action='store_true', help='if present, use bidirectional lstm')
@@ -250,18 +244,14 @@ if __name__ == '__main__':
     inp_size = len(COMMENT.vocab)
     out_size = 1
     assert args.eS == len(COMMENT.vocab.vectors[1])
-    # model = RNN(inp_size, args.eS, args.hS, out_size, args.num_layer, args.bidirect, args.dr)
 
+    if args.model == 'rnn':
+        model = RNN(inp_size, args.eS, args.hS, out_size, args.num_layer, args.bidirect, args.dr)
 
-
-    INPUT_DIM = len(COMMENT.vocab)
-    EMBEDDING_DIM = 100
-    N_FILTERS = 100
-    FILTER_SIZES = [3,4,5]
-    OUTPUT_DIM = 1
-    DROPOUT = 0.5
-
-    model = CNN(INPUT_DIM, EMBEDDING_DIM, N_FILTERS, FILTER_SIZES, OUTPUT_DIM, DROPOUT)
+    elif args.model == 'cnn':
+        n_filters = 100
+        filter_sizes = [3,4,5]
+        model = CNN(inp_size, args.eS, n_filters, filter_sizes, out_size, args.dr)
 
     # Use GloVe
     pretrained_embeddings = COMMENT.vocab.vectors
@@ -269,8 +259,8 @@ if __name__ == '__main__':
     model.embedding.weight.data.copy_(pretrained_embeddings)
 
     # set opt and criterion
-    if args.opt_adam:
-        opt = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, weight_decay=0)
+    if not args.opt_sgd:
+        opt = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, weight_decay=args.w_decay)
     else:
         opt = optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
     criterion = nn.BCEWithLogitsLoss()
@@ -279,26 +269,23 @@ if __name__ == '__main__':
 
     
     best_valid_acc = -1
-    # train
     for epoch in range(args.nepoch):
         print(epoch)
         train_loss, train_acc = train(model, train_iterator, opt, criterion)
         valid_loss, valid_acc = evaluate(model, valid_iterator, criterion)
-        
-        # save best model
+
         if valid_acc > best_valid_acc:
             best_valid_acc = valid_acc
             state = {'model': model.state_dict(), 'epoch': epoch}
             torch.save(state, os.path.join('.', 'model_best.pt'))
-
-        print(f'| Epoch: {epoch+1:02} | Train Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}% | Val. Loss: {valid_loss:.3f} | Val. Acc: {valid_acc*100:.2f}% |')
+        print(f' Epoch: {epoch+1:02}  Train Loss: {train_loss:.3f} Train Acc: {train_acc*100:.2f}% Val. Loss: {valid_loss:.3f} Val. Acc: {valid_acc*100:.2f}%')
 
     spacy_tkr = spacy.load('en')
     check_point = torch.load(os.path.join('.', 'model_best.pt'))
-    print(predict_sentiment(model, COMMENT, "You are amazing", spacy_tkr))
+    print(predict_sentiment(args, model, COMMENT, "You are amazing", spacy_tkr))
     model.load_state_dict(check_point['model'])
     print(f"Best model from epoch {check_point['epoch']}")
-    print(predict_sentiment(model, COMMENT, "You are amazing", spacy_tkr))
+    print(predict_sentiment(args, model, COMMENT, "You are amazing", spacy_tkr))
     # submit
     sub_f = os.path.join(data_path, 'test.tsv')
     sub_df = pd.read_csv(sub_f, sep='\t')
