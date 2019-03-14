@@ -10,30 +10,36 @@ import spacy
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-import numpy as np
 import random
 # from torch.autograd import Variable
 # from torch.utils.data import Dataset, DataLoader
 from torchtext import data
 from torchtext import datasets
-
+spacy_tkr = spacy.load('en')
 
 # LABEL = data.Field(sequential=False)
 
 ###########TODO: ADD submit=True args so that for submission, use all data to train?
 
 
-def get_data(train, test, lower=False):
-    LABEL = data.LabelField(dtype=torch.float)
-    if lower:
-        COMMENT = data.Field(lower=True)
+def tokenizer_cnn(text):
+    # to pad for filter_size
+    token = [t.text for t in spacy_tkr.tokenizer(text)]
+    if len(token) < 5:
+        for i in range(0, 5 - len(token)):
+            token.append('<pad>')
+    return token
+
+def get_data(args, train, test):
+    if args.model == 'cnn':
+        COMMENT = data.Field(tokenize=tokenizer_cnn, lower=args.lower)
     else:
-        COMMENT = data.Field()
+        COMMENT = data.Field(lower=args.lower)
+    LABEL = data.LabelField(dtype=torch.float)
     # PARENT = data.Field()
     fields = [('l', LABEL), ('c', COMMENT), (None, None)]
 
     print(train, test)
-
     train_data, test_data = data.TabularDataset.splits(
                                             path = '',
                                             train = train,
@@ -153,10 +159,10 @@ def train(model, iterator, optimizer, criterion):
     for batch in iterator:
         optimizer.zero_grad()
         pred = model(batch.c).squeeze(1)
-        print(batch.l)
-        print(batch.c.shape)
-        print(len(batch), len(batch.c))
-        print('******************************')
+        # print(batch.l)
+        # print(batch.c.shape)
+        # print(len(batch), len(batch.c))
+        # print('******************************')
         pred = model(batch.c).squeeze(1)
         loss= criterion(pred, batch.l)
         acc = binary_accuracy(pred, batch.l)
@@ -181,6 +187,7 @@ def evaluate(model, iterator, criterion):
             epoch_acc += acc.item()
 
     return epoch_loss / len(iterator), epoch_acc / len(iterator)
+
 
 def predict_sentiment(model, COMMENT, sentence, s_tkr):
     tokenized = [tok.text for tok in s_tkr.tokenizer(str(sentence))]
@@ -209,6 +216,7 @@ if __name__ == '__main__':
     parser.add_argument("--test_file", default='val_resplit.tsv', type=str, help='validation data')
     parser.add_argument("--sub_name", default='submit', type=str, help='name for submission tsv, .tsv will be added automatically')
     parser.add_argument("--lower", action='store_true', help='if present, do lowercase to train/test data')
+    parser.add_argument("--model", default='cnn', help='cnn or rnn')
     args = parser.parse_args()
 
     if torch.cuda.is_available():
@@ -217,12 +225,18 @@ if __name__ == '__main__':
     if args.bidirect:
         print('Using bidirectional LSTM')
 
+    if args.model == 'cnn':
+        print('Using cnn')
+
     # load dataset
     data_path = args.path
     print(os.path.join(data_path, args.train_file))
     train_f = os.path.join(data_path, args.train_file)
     test_f = os.path.join(data_path, args.test_file)
-    train_data, val_data, test_data, COMMENT = get_data(train_f, test_f)
+
+    # pad sequence to minimum filter size(5)
+
+    train_data, val_data, test_data, COMMENT = get_data(args, train_f, test_f)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # build dataloader (torchtext)
