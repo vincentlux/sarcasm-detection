@@ -102,12 +102,16 @@ class CNN(nn.Module):
 
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
         # Each of our kernel_sizes is going to be [n x emb_dim] where $n$ is the size of the n-grams
-        self.conv_0 = nn.Conv2d(in_channels=1, out_channels=n_filters, kernel_size=(filter_sizes[0], embedding_dim))
-        self.conv_1 = nn.Conv2d(in_channels=1, out_channels=n_filters, kernel_size=(filter_sizes[1], embedding_dim))
-        self.conv_2 = nn.Conv2d(in_channels=1, out_channels=n_filters, kernel_size=(filter_sizes[2], embedding_dim))
+        # self.conv_0 = nn.Conv2d(in_channels=1, out_channels=n_filters, kernel_size=(filter_sizes[0], embedding_dim))
+        # self.conv_1 = nn.Conv2d(in_channels=1, out_channels=n_filters, kernel_size=(filter_sizes[1], embedding_dim))
+        # self.conv_2 = nn.Conv2d(in_channels=1, out_channels=n_filters, kernel_size=(filter_sizes[2], embedding_dim))
+        self.convs = nn.ModuleList([
+                                    nn.Conv2d(in_channels = 1, out_channels = n_filters, 
+                                              kernel_size = (fs, embedding_dim)) 
+                                    for fs in filter_sizes
+                                    ])
         self.fc = nn.Linear(len(filter_sizes) * n_filters, output_dim)
         self.dropout = nn.Dropout(dropout)
-
 
     def forward(self, text):
         #text = [sent len, batch size]
@@ -119,17 +123,22 @@ class CNN(nn.Module):
         embedded = embedded.unsqueeze(1)
         #embedded = [batch size, 1, sent len, emb dim]
 
-        conved_0 = F.relu(self.conv_0(embedded).squeeze(3))
-        conved_1 = F.relu(self.conv_1(embedded).squeeze(3))
-        conved_2 = F.relu(self.conv_2(embedded).squeeze(3))
+        # conved_0 = F.relu(self.conv_0(embedded).squeeze(3))
+        # conved_1 = F.relu(self.conv_1(embedded).squeeze(3))
+        # #conv_n = [batch size, n_filters, sent len - filter_sizes[n]]
+
+        # pooled_0 = F.max_pool1d(conved_0, conved_0.shape[2]).squeeze(2)
+        # pooled_1 = F.max_pool1d(conved_1, conved_1.shape[2]).squeeze(2)
+        # #pooled_n = [batch size, n_filters]
+
+        # cat = self.dropout(torch.cat((pooled_0, pooled_1, pooled_2), dim=1))
+        conved = [F.relu(conv(embedded)).squeeze(3) for conv in self.convs]
         #conv_n = [batch size, n_filters, sent len - filter_sizes[n]]
-
-        pooled_0 = F.max_pool1d(conved_0, conved_0.shape[2]).squeeze(2)
-        pooled_1 = F.max_pool1d(conved_1, conved_1.shape[2]).squeeze(2)
-        pooled_2 = F.max_pool1d(conved_2, conved_2.shape[2]).squeeze(2)
+        
+        pooled = [F.max_pool1d(conv, conv.shape[2]).squeeze(2) for conv in conved]
         #pooled_n = [batch size, n_filters]
-
-        cat = self.dropout(torch.cat((pooled_0, pooled_1, pooled_2), dim=1))
+        
+        cat = self.dropout(torch.cat(pooled, dim=1))
         #cat = [batch size, n_filters * len(filter_sizes)]
         return self.fc(cat)
 
@@ -213,6 +222,7 @@ if __name__ == '__main__':
     parser.add_argument("--sub_name", default='submit', type=str, help='name for submission tsv, .tsv will be added automatically')
     parser.add_argument("--lower", action='store_true', help='if present, do lowercase to train/test data')
     parser.add_argument("--w_decay", default=1e-5, type=float, help='regularization param')
+    parser.add_argument("--filter_size", default=345, type=int, help='filter sizes(ngram to be fed into cnn)')
     parser.add_argument("--model", default='cnn', help='cnn or rnn')
     args = parser.parse_args()
 
@@ -251,7 +261,8 @@ if __name__ == '__main__':
 
     elif args.model == 'cnn':
         n_filters = 100
-        filter_sizes = [3,4,5]
+        
+        filter_sizes = [int(x) for x in str(args.filter_size)]
         model = CNN(inp_size, args.eS, n_filters, filter_sizes, out_size, args.dr)
 
     # Use GloVe
