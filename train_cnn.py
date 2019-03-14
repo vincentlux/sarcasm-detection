@@ -105,7 +105,7 @@ class CNN(nn.Module):
         self.conv_0 = nn.Conv2d(in_channels=1, out_channels=n_filters, kernel_size=(filter_sizes[0], embedding_dim))
         self.conv_1 = nn.Conv2d(in_channels=1, out_channels=n_filters, kernel_size=(filter_sizes[1], embedding_dim))
         self.conv_2 = nn.Conv2d(in_channels=1, out_channels=n_filters, kernel_size=(filter_sizes[2], embedding_dim))
-        self.fc = nn.Linear(len(filter_sizes) * filter_sizes, output_dim)
+        self.fc = nn.Linear(len(filter_sizes) * n_filters, output_dim)
         self.dropout = nn.Dropout(dropout)
 
 
@@ -152,6 +152,11 @@ def train(model, iterator, optimizer, criterion):
     model.train()
     for batch in iterator:
         optimizer.zero_grad()
+        pred = model(batch.c).squeeze(1)
+        print(batch.l)
+        print(batch.c.shape)
+        print(len(batch), len(batch.c))
+        print('******************************')
         pred = model(batch.c).squeeze(1)
         loss= criterion(pred, batch.l)
         acc = binary_accuracy(pred, batch.l)
