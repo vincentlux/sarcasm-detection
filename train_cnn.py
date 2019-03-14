@@ -271,7 +271,7 @@ if __name__ == '__main__':
     
     best_valid_acc = -1
     for epoch in range(args.nepoch):
-        print(epoch)
+        # print(epoch)
         train_loss, train_acc = train(model, train_iterator, opt, criterion)
         valid_loss, valid_acc = evaluate(model, valid_iterator, criterion)
 
@@ -285,7 +285,7 @@ if __name__ == '__main__':
     check_point = torch.load(os.path.join('.', 'model_best.pt'))
     print(predict_sentiment(args, model, COMMENT, "You are amazing", spacy_tkr))
     model.load_state_dict(check_point['model'])
-    print(f"Best model from epoch {check_point['epoch']}")
+    print(f"Best model from epoch {check_point['epoch']+1}")
     print(predict_sentiment(args, model, COMMENT, "You are amazing", spacy_tkr))
     # submit
     sub_f = os.path.join(data_path, 'test.tsv')
@@ -309,6 +309,6 @@ if __name__ == '__main__':
 
     dout = os.path.join(args.out_path, args.sub_name+'.csv')
     sub_df["label"].to_csv(dout, header=["label"], index_label="id")
-
+    print(f"submission file successfully saved as {dout}")
 
     ########SAVE result
