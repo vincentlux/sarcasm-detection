@@ -212,6 +212,7 @@ if __name__ == '__main__':
     parser.add_argument("--test_file", default='val_resplit.tsv', type=str, help='validation data')
     parser.add_argument("--sub_name", default='submit', type=str, help='name for submission tsv, .tsv will be added automatically')
     parser.add_argument("--lower", action='store_true', help='if present, do lowercase to train/test data')
+    parser.add_argument("--w_decay", default=1e-5, type=float, help='regularization param')
     parser.add_argument("--model", default='cnn', help='cnn or rnn')
     args = parser.parse_args()
 
