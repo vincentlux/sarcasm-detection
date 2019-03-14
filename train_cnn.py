@@ -24,8 +24,9 @@ spacy_tkr = spacy.load('en')
 def tokenizer_cnn(text):
     # to pad for filter_size
     token = [t.text for t in spacy_tkr.tokenizer(text)]
-    if len(token) < 5:
-        for i in range(0, 5 - len(token)):
+    filter_sizes = [int(x) for x in str(args.filter_size)]
+    if len(token) < filter_sizes[-1]:
+        for i in range(0, filter_sizes[-1] - len(token)):
             token.append('<pad>')
     return token
 
