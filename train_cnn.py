@@ -195,8 +195,8 @@ def evaluate(model, iterator, criterion):
 
 def predict_sentiment(args, model, COMMENT, sentence, s_tkr):
     tokenized = [tok.text for tok in s_tkr.tokenizer(str(sentence))]
-    if args.model == 'cnn' and len(tokenized) < 5:
-        tokenized += ['<pad>'] * (5 - len(tokenized))
+    if args.model == 'cnn' and len(tokenized) < filter_sizes[-1]:
+        tokenized += ['<pad>'] * (filter_sizes[-1] - len(tokenized))
     indexed = [COMMENT.vocab.stoi[t] for t in tokenized]
     tensor = torch.LongTensor(indexed).to(device)
     tensor = tensor.unsqueeze(1)
