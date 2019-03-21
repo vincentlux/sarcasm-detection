@@ -216,6 +216,7 @@ if __name__ == '__main__':
     parser.add_argument("--lr", default=0.0001, type=float, help='learning rate')
 
     parser.add_argument('--bidirect', action='store_true', help='if present, use bidirectional lstm')
+    parser.add_argument('--no_glove', action='store_true', help='if present, use bow')
     parser.add_argument("--path", default='./data', type=str, help='data dir')
     parser.add_argument("--out_path", default='./result', type=str, help='out dir')
     parser.add_argument("--train_file", default='train_resplit.tsv', type=str, help='training data')
@@ -267,9 +268,12 @@ if __name__ == '__main__':
         model = CNN(inp_size, args.eS, n_filters, filter_sizes, out_size, args.dr)
 
     # Use GloVe
-    pretrained_embeddings = COMMENT.vocab.vectors
-    print(len(COMMENT.vocab.vectors[1]))
-    model.embedding.weight.data.copy_(pretrained_embeddings)
+    if args.no_glove:
+        pass
+    else:
+        pretrained_embeddings = COMMENT.vocab.vectors
+        print(len(COMMENT.vocab.vectors[1]))
+        model.embedding.weight.data.copy_(pretrained_embeddings)
 
     # set opt and criterion
     if not args.opt_sgd:
